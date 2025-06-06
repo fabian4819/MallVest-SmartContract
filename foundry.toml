@@ -5,7 +5,8 @@ libs = ["lib"]
 solc_version = "0.8.20"
 
 remappings = [
-    "@openzeppelin/=lib/openzeppelin-contracts/"
+    "@openzeppelin/=lib/openzeppelin-contracts/",
+    "@chainlink/=lib/chainlink/contracts/src/v0.8/"
 ]
 
 [rpc_endpoints]
