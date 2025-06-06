@@ -11,4 +11,19 @@ contract MockUSDC is ERC20 {
     function decimals() public pure override returns (uint8) {
         return 6;
     }
+
+    function transferAndCall(address to, uint256 value, bytes calldata data) external returns (bool success) {
+        _transfer(msg.sender, to, value);
+
+        // Simulate the call to onTokenTransfer (required for Chainlink Oracle)
+        (bool ok,) = to.call(abi.encodeWithSelector(
+            bytes4(keccak256("onTokenTransfer(address,uint256,bytes)")),
+            msg.sender,
+            value,
+            data
+        ));
+        require(ok, "onTokenTransfer failed");
+
+        return true;
+    }
 }

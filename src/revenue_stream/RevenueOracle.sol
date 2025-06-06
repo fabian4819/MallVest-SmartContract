@@ -1,65 +1,34 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {FunctionsClient} from "@chainlink/functions/v1_0_0/FunctionsClient.sol";
-import {FunctionsRequest} from "@chainlink/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {ChainlinkClient} from "@chainlink/operatorforwarder/ChainlinkClient.sol";
+import {Chainlink} from "@chainlink/operatorforwarder/Chainlink.sol";
 
-contract RevenueOracle is FunctionsClient {
-    using FunctionsRequest for FunctionsRequest.Request;
+contract RevenueOracle is ChainlinkClient {
+    using Chainlink for Chainlink.Request;
 
-    mapping(address => uint256) public lastRevenue;
+    address private oracle;
+    bytes32 private jobId;
+    uint256 private fee;
+    uint256 public revenue;
 
-    bytes32 public lastRequestId;
-    uint64 public subscriptionId;
-
-    event RevenueRequested(bytes32 requestId);
-    event RevenueUpdated(address vault, uint256 revenue);
-
-    constructor(address router, uint64 _subscriptionId) FunctionsClient(router) {
-        subscriptionId = _subscriptionId;
+    constructor(address _oracle, bytes32 _jobId, address _link) {
+        _setChainlinkToken(_link);
+        oracle = _oracle;
+        jobId = _jobId;
+        fee = 0.1 * 10 ** 18;
     }
 
-    function updateRevenue(string memory vaultAddress, string memory period) external {
-        FunctionsRequest.Request memory req;
+    function requestRevenue(string memory vaultAddress, string memory period) public returns (bytes32) {
+        Chainlink.Request memory req = _buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
 
-        string memory url = string(
-            abi.encodePacked(
-                "https://mall-vest-backend.vercel.app/reports/",
-                vaultAddress,
-                "/",
-                period
-            )
-        );
+        req._add("vaultAddress", vaultAddress);
+        req._add("period", period);
 
-        string memory source = string(
-            abi.encodePacked(
-                "const response = await Functions.makeHttpRequest({",
-                " url: '", url, "',",
-                " method: 'GET'",
-                "});",
-                "if (response.error) throw Error(JSON.stringify(response));",
-                "return Functions.encodeUint256(response.data.totalRevenue);"
-            )
-        );
-
-        req.initializeRequest(
-            FunctionsRequest.Location.Remote,
-            FunctionsRequest.CodeLanguage.JavaScript,
-            source
-        );
-
-        lastRequestId = _sendRequest(req.encodeCBOR(), subscriptionId, 300000, bytes32(0));
-        emit RevenueRequested(lastRequestId);
+        return _sendChainlinkRequestTo(oracle, req, fee);
     }
 
-    function fulfillRequest(
-        bytes32,
-        bytes memory response,
-        bytes memory err
-    ) internal override {
-        require(err.length == 0, "Chainlink oracle returned error");
-        uint256 revenue = abi.decode(response, (uint256));
-        lastRevenue[msg.sender] = revenue;
-        emit RevenueUpdated(msg.sender, revenue);
+    function fulfill(bytes32 _requestId, uint256 _revenue) public recordChainlinkFulfillment(_requestId) {
+        revenue = _revenue;
     }
 }

@@ -1,56 +1,30 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
-
 import "forge-std/Test.sol";
-import "../../src/revenue_stream/RevenueOracleTestable.sol";
+
+import {RevenueOracle} from "../../src/revenue_stream/RevenueOracle.sol";
+import {MockUSDC} from "../../src/token_exchange/MockUSDC.sol";
 
 contract RevenueOracleTest is Test {
-    RevenueOracleTestable oracle;
-
-    // Dummy router address, can be anything for testing
-    address dummyRouter = address(0x1234);
-    uint64 dummySubscriptionId = 1;
-
-    // Events for testing
-    event RevenueUpdated(address vault, uint256 revenue);
+    RevenueOracle revenueOracle;
+    address oracle = address(0x123);
+    bytes32 jobId = bytes32("29fa9aa13bf1468788b7cc4a500a45b8"); // example jobId
 
     function setUp() public {
-        oracle = new RevenueOracleTestable(dummyRouter, dummySubscriptionId);
+        MockUSDC usdc = new MockUSDC(1e18, "LaLoUSDC", "LUSDC");
+        revenueOracle = new RevenueOracle(oracle, jobId, address(usdc));
+        // Fund RevenueOracle with USDC so it can pay fee
+        usdc.transfer(address(revenueOracle), 1e18); // amount >= fee in your contract
     }
 
-    function testFulfillRequestUpdatesRevenue() public {
-        // Simulate encoded uint256 revenue returned from oracle
-        uint256 fakeRevenue = 123456789;
-
-        // Encode fakeRevenue as bytes (like oracle response)
-        bytes memory fakeResponse = abi.encode(fakeRevenue);
-
-        // No error bytes (empty)
-        bytes memory emptyError = "";
-
-        // Expect event RevenueUpdated emitted with correct params
-        vm.expectEmit(true, true, false, true);
-        emit RevenueUpdated(address(this), fakeRevenue);
-
-        // Call the test function that exposes fulfillRequest
-        oracle.testFulfillRequest(fakeResponse, emptyError);
-
-        // Check that lastRevenue for this caller is updated
-        uint256 storedRevenue = oracle.lastRevenue(address(this));
-        assertEq(storedRevenue, fakeRevenue, "Revenue not updated correctly");
+    function testInitialRevenueIsZero() public view {
+        uint256 rev = revenueOracle.revenue();
+        assertEq(rev, 0);
     }
 
-    function testFulfillRequestRevertsOnError() public {
-        // Simulate error bytes (non-empty)
-        bytes memory errorBytes = abi.encodePacked("error occurred");
-
-        // Any response data (can be empty)
-        bytes memory dummyResponse = "";
-
-        // Expect revert with message "Chainlink oracle returned error"
-        vm.expectRevert(bytes("Chainlink oracle returned error"));
-
-        // This should revert
-        oracle.testFulfillRequest(dummyResponse, errorBytes);
+    function testRequestRevenueReturnsRequestId() public {
+        // This will return a requestId (bytes32)
+        bytes32 requestId = revenueOracle.requestRevenue("0xabcde", "2025-06");
+        assert(requestId != bytes32(0));
     }
 }
