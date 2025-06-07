@@ -1,59 +1,71 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.7;
 
-import "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 
-contract RevenueOracle is ChainlinkClient, ConfirmedOwner {
-    error InsufficientBalance();
-
+contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
 
-    address private oracle;
-    bytes32 private jobId;
-    uint256 private fee;
-    uint256 public revenue;
+    uint256 public response;
+
+    bytes32 public jobId;
+    uint256 public fee;
 
     constructor() ConfirmedOwner(msg.sender) {
-        // Set the LINK token address (Sepolia)
+        // LINK Token
         _setChainlinkToken(0x779877A7B0D9E8603169DdbD7836e478b4624789);
-
-        // Oracle and jobId must match what's deployed on Chainlink node
-        oracle = 0x0FaCf846af22BCE1C7f88D1d55A038F27747eD2B;
-        jobId = 0x6138333536663438353639633433346561613461633566636234646235636330;
-
-        // 1 LINK (in wei)
-        fee = 1 * 10 ** 18;
+        // LinkWell Oracle
+        _setChainlinkOracle(0x0FaCf846af22BCE1C7f88D1d55A038F27747eD2B);
+        jobId = "a8356f48569c434eaa4ac5fcb4db5cc0";
+        fee = 0; // 0 LINK job
     }
 
-    function requestRevenue(string memory vaultAddress, string memory period) public returns (bytes32 requestId) {
-        if (LinkTokenInterface(_chainlinkTokenAddress()).balanceOf(address(this)) < fee) {
-            revert InsufficientBalance();
-        }
+    function requestRevenue(address vaultAddress, string memory period) public {
+        Chainlink.Request memory req = _buildOperatorRequest(jobId, this.fulfill.selector);
 
-        Chainlink.Request memory req = _buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
+        req._add("method", "POST");
+        req._add("url", "https://mall-vest-external-adapter.vercel.app/");
+        req._add("headers", '["Content-Type", "application/json"]');
 
-        string memory url = string(abi.encodePacked(
-            "https://mall-vest-backend.vercel.app/reports/",
-            vaultAddress,
-            "/",
-            period
+        // Compose the nested JSON body
+        string memory json = string(abi.encodePacked(
+            '{"id":"test-job-123","data":{"vaultAddress":"',
+            toAsciiString(vaultAddress),
+            '","period":"',
+            period,
+            '"}}'
         ));
 
-        req._add("url", url);
-        req._add("path", "data.revenue");       // Use dot notation for nested JSON
-        req._addInt("times", 10 ** 18);         // Use `times` not `multiplier`
+        req._add("body", json);
+        req._add("path", "result");
+        req._addInt("multiplier", 1);
+        req._add("contact", "yitzhaketmanalu@gmail.com");
 
-        // Make the request
-        requestId = _sendChainlinkRequestTo(oracle, req, fee);
+        _sendOperatorRequest(req, fee);
     }
 
-    function fulfill(bytes32 _requestId, uint256 _revenue) public recordChainlinkFulfillment(_requestId) {
-        revenue = _revenue;
+    function fulfill(bytes32 _requestId, uint256 _data) public recordChainlinkFulfillment(_requestId) {
+        response = _data;
     }
 
-    function getLinkBalance() external view returns (uint256) {
-    return LinkTokenInterface(0x779877A7B0D9E8603169DdbD7836e478b4624789).balanceOf(address(this));
-}
+    function toAsciiString(address x) internal pure returns (string memory) {
+        bytes memory s = new bytes(42);
+        s[0] = '0';
+        s[1] = 'x';
+        for (uint i = 0; i < 20; i++) {
+            bytes1 b = bytes1(uint8(uint(uint160(x)) / (2**(8*(19 - i)))));
+            bytes1 hi = bytes1(uint8(b) / 16);
+            bytes1 lo = bytes1(uint8(b) - 16 * uint8(hi));
+            s[2 + 2*i] = char(hi);
+            s[3 + 2*i] = char(lo);
+        }
+        return string(s);
+    }
+
+    function char(bytes1 b) internal pure returns (bytes1 c) {
+        if (uint8(b) < 10) return bytes1(uint8(b) + 0x30);
+        else return bytes1(uint8(b) + 0x57);
+    }
 
 }
