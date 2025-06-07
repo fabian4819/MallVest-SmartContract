@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.7;
 
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
@@ -7,7 +7,16 @@ import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
 contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
 
-    uint256 public response;
+    // Store responses by vaultAddress => period => revenue
+    mapping(address => mapping(string => uint256)) public responses;
+
+    // Temporary storage to track request metadata
+    struct RequestMeta {
+        address vaultAddress;
+        string period;
+    }
+
+    mapping(bytes32 => RequestMeta) private requestMeta;
 
     bytes32 public jobId;
     uint256 public fee;
@@ -28,7 +37,6 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
         req._add("url", "https://mall-vest-external-adapter.vercel.app/");
         req._add("headers", '["Content-Type", "application/json"]');
 
-        // Compose the nested JSON body
         string memory json = string(abi.encodePacked(
             '{"id":"test-job-123","data":{"vaultAddress":"',
             toAsciiString(vaultAddress),
@@ -42,11 +50,16 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
         req._addInt("multiplier", 1);
         req._add("contact", "yitzhaketmanalu@gmail.com");
 
-        _sendOperatorRequest(req, fee);
+        bytes32 requestId = _sendOperatorRequest(req, fee);
+        requestMeta[requestId] = RequestMeta(vaultAddress, period);
     }
 
     function fulfill(bytes32 _requestId, uint256 _data) public recordChainlinkFulfillment(_requestId) {
-        response = _data;
+        RequestMeta memory meta = requestMeta[_requestId];
+        responses[meta.vaultAddress][meta.period] = _data;
+
+        // Clean up to save gas (optional)
+        delete requestMeta[_requestId];
     }
 
     function toAsciiString(address x) internal pure returns (string memory) {
@@ -67,5 +80,4 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
         if (uint8(b) < 10) return bytes1(uint8(b) + 0x30);
         else return bytes1(uint8(b) + 0x57);
     }
-
 }
