@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.7;
 
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
-import "@chainlink/contracts/src/v0.8/ConfirmedOwner.sol";
+import {Chainlink} from "@chainlink/operatorforwarder/Chainlink.sol";
+import {ChainlinkClient} from "@chainlink/operatorforwarder/ChainlinkClient.sol";
+import {ConfirmedOwner} from "@chainlink/shared/access/ConfirmedOwner.sol";
 
-contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
+contract RevenueOracle is ChainlinkClient, ConfirmedOwner {
     using Chainlink for Chainlink.Request;
 
     // Store responses by vaultAddress => period => revenue
@@ -18,6 +19,7 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
 
     mapping(bytes32 => RequestMeta) private requestMeta;
 
+    address public oracleAddress;
     bytes32 public jobId;
     uint256 public fee;
 
@@ -25,7 +27,8 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
         // LINK Token
         _setChainlinkToken(0x779877A7B0D9E8603169DdbD7836e478b4624789);
         // LinkWell Oracle
-        _setChainlinkOracle(0x0FaCf846af22BCE1C7f88D1d55A038F27747eD2B);
+        oracleAddress = 0x0FaCf846af22BCE1C7f88D1d55A038F27747eD2B;
+        _setChainlinkOracle(oracleAddress);
         jobId = "a8356f48569c434eaa4ac5fcb4db5cc0";
         fee = 0; // 0 LINK job
     }
@@ -80,4 +83,9 @@ contract RevenueFetcher is ChainlinkClient, ConfirmedOwner {
         if (uint8(b) < 10) return bytes1(uint8(b) + 0x30);
         else return bytes1(uint8(b) + 0x57);
     }
+
+    // // Add this in RevenueFetcher for test purposes only
+    // function __testSetRequestMeta(bytes32 requestId, address vaultAddress, string memory period) public {
+    //     requestMeta[requestId] = RequestMeta(vaultAddress, period);
+    // }
 }

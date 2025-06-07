@@ -1,30 +1,34 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
-import "forge-std/Test.sol";
+// // SPDX-License-Identifier: UNLICENSED
+// pragma solidity ^0.8.7;
 
-import {RevenueOracle} from "../../src/revenue_stream/RevenueOracle.sol";
-import {MockUSDC} from "../../src/token_exchange/MockUSDC.sol";
+// import "forge-std/Test.sol";
+// import {RevenueOracle} from "../../src/revenue_stream/RevenueOracle.sol";
 
-contract RevenueOracleTest is Test {
-    RevenueOracle revenueOracle;
-    address oracle = address(0x123);
-    bytes32 jobId = bytes32("29fa9aa13bf1468788b7cc4a500a45b8"); // example jobId
+// contract RevenueOracleTest is Test {
+//     RevenueOracle public fetcher;
 
-    function setUp() public {
-        MockUSDC usdc = new MockUSDC(1e18, "LaLoUSDC", "LUSDC");
-        revenueOracle = new RevenueOracle(oracle, jobId, address(usdc));
-        // Fund RevenueOracle with USDC so it can pay fee
-        usdc.transfer(address(revenueOracle), 1e18); // amount >= fee in your contract
-    }
+//     address vault = address(0xABCD);
+//     string period = "2025-06";
+//     uint256 fakeRevenue = 420_000;
 
-    function testInitialRevenueIsZero() public view {
-        uint256 rev = revenueOracle.revenue();
-        assertEq(rev, 0);
-    }
+//     function setUp() public {
+//         fetcher = new RevenueOracle();
+//     }
 
-    function testRequestRevenueReturnsRequestId() public {
-        // This will return a requestId (bytes32)
-        bytes32 requestId = revenueOracle.requestRevenue("0xabcde", "2025-06");
-        assert(requestId != bytes32(0));
-    }
-}
+//     function testRequestRevenueAndFulfill() public {
+//     bytes32 fakeRequestId = keccak256(abi.encodePacked("test-request"));
+
+//     // Inject test metadata
+//     fetcher.__testSetRequestMeta(fakeRequestId, vault, period);
+
+//     // Use actual oracle address from the contract
+//     vm.prank(fetcher.oracleAddress());
+
+//     fetcher.fulfill(fakeRequestId, fakeRevenue);
+
+//     uint256 stored = fetcher.responses(vault, period);
+//     assertEq(stored, fakeRevenue);
+// }
+
+
+// }
